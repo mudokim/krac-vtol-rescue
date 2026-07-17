@@ -1,0 +1,39 @@
+# krac_gimbal / approach_node 파라미터
+# REP 지점에서 직하(-90°)로도 YOLO/ArUco가 안 잡힐 때만 arm 되는 노드.
+# 하향 60°로 눕혀 동서남북(sweep_yaw_deg) 방향을 순회 탐색 -> 발견 시 90° 직하로
+# 정렬하며 물체 위로 접근.
+/approach_node:
+  ros__parameters:
+    control_rate_hz: 15.0
+
+    # ---- 스윕(SWEEP) 탐색 ----
+    sweep_pitch_deg: 60.0            # 스윕 시 하향각(직하보다 얕게, 지면을 넓게 봄)
+    sweep_yaw_deg: [0.0, 90.0, 135.0, -90.0]  # 순회할 방향(기체 기준 상대각, °). 180은 하드웨어 한계(±135)로 135 대체
+    sweep_settle_sec: 1.5            # 방향 전환 후 짐벌 물리적 정착 대기
+    sweep_check_sec: 1.0             # 정착 후 판정 대기 시간
+    sweep_detect_frames: 3           # 그 방향에서 확정 판정할 연속 탐지 프레임
+
+    # ---- 접근/오버헤드 판정 ----
+    overhead_pitch_tol_deg: 5.0      # |pitch| >= 90-이값 이면 '직하 도달'
+    center_tol: 0.08                 # 정규화 픽셀오차 수렴 임계(0~1)
+
+    # ---- 영상 해상도(vision_tracker 기준 1024x1024) ----
+    image_width: 1024
+    image_height: 1024
+
+    # ---- 짐벌 비주얼 서보 게인(정규화 오차 → °/cycle) ----
+    kp_gimbal_pitch: 3.0
+    kp_gimbal_yaw: 3.0
+    gimbal_step_max_deg: 3.0      # 1주기 최대 각도 변화(스무딩)
+
+    # ---- 기체 접근 속도 법칙 ----
+    kv_fwd: 0.04                  # (90-|pitch|)° 당 전진속도 → 60°시작 시 ≈1.2 m/s
+    v_max: 1.5                    # 최대 수평속도(m/s)
+    lateral_sign: 1.0             # 횡방향 부호(프레임 보정: 실기/SITL 로 ±1 검증)
+
+    # ---- 탐지/안전 ----
+    lost_timeout_sec: 1.0         # 타깃 소실 시 정지까지
+    overhead_frames: 8            # OVERHEAD 판정 디바운스
+
+    # ---- 핸드오프 ----
+    handoff_precision_lander: true   # OVERHEAD 도달 시 /precision_lander/enable(true) 자동 호출

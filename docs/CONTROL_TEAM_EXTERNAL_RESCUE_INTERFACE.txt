@@ -1,0 +1,219 @@
+제어팀용 외부 구조 모듈 인터페이스
+================================
+
+1. BT가 호출하는 조건
+--------------------
+
+BT가 아래 조건을 만족한 뒤 제어팀 모듈을 호출합니다.
+
+로컬 ENU 목표:
+  x = -26.03 m
+  y = -31.41 m
+  z = 3.00 m
+
+도착 허용 오차:
+  XY <= 0.50 m
+  Z  <= 0.45 m
+
+안정 hover:
+  수평속도 <= 0.50 m/s
+  |수직속도| <= 0.30 m/s
+  1.50초 이상 유지
+
+추가 상태:
+  PX4 mode = OFFBOARD
+  VTOL state = MC
+  armed = true
+
+
+2. BT -> 제어팀 시작 신호
+------------------------
+
+토픽:
+  /krac/rescue_module/enable
+
+타입:
+  std_msgs/msg/Bool
+
+값:
+  true  = 구조 제어 시작 요청
+  false = 제어권 반납 요청
+
+
+3. 제어권 인수 절차
+------------------
+
+enable=true를 받으면 바로 ready를 보내면 안 됩니다.
+
+제어팀은 먼저 현재 위치 hold setpoint를 발행해야 합니다.
+
+권장 주기:
+  20 Hz
+
+최소:
+  10 Hz 이상
+
+자기 setpoint stream이 실제로 동작한 뒤:
+
+토픽:
+  /krac/rescue_module/ready
+
+타입:
+  std_msgs/msg/Bool
+
+값:
+  true
+
+BT는 ready=true를 받은 다음에만 기존 hold setpoint를 중지합니다.
+그때부터 제어팀이 기체 제어를 전담합니다.
+
+
+4. 제어팀 내부 책임
+------------------
+
+아래 작업은 제어팀 노드가 전부 담당합니다.
+
+  구조물 검출
+  중심 정렬
+  하강
+  높이/속도/target 검증
+  그리퍼 닫기
+  contact 또는 attach 확인
+  구조물을 붙인 채 상승
+  구조물 이탈 확인
+  최종 hover 안정 확인
+
+BT는 이 내부 로직에 관여하지 않습니다.
+
+
+5. 제어팀 -> BT 최종 결과
+------------------------
+
+토픽:
+  /krac/rescue_module/result
+
+타입:
+  std_msgs/msg/String
+
+성공:
+  SUCCESS
+
+실패:
+  FAILURE:실패이유
+
+예:
+  FAILURE:target_lost
+  FAILURE:descent_timeout
+  FAILURE:gripper_failed
+  FAILURE:payload_not_attached
+  FAILURE:payload_dropped
+
+
+6. SUCCESS를 보내는 시점
+-----------------------
+
+다음 조건이 모두 끝난 뒤에만 SUCCESS를 보냅니다.
+
+  구조물 실제 파지 확인
+  contact/attach=true
+  구조물을 붙인 채 목표 높이까지 상승
+  상승 중 구조물 이탈 없음
+  기체 자세 정상
+  OFFBOARD 유지
+  최종 hover 안정
+  다음 귀환 mission을 바로 시작해도 안전함
+
+그리퍼를 닫은 직후 SUCCESS를 보내면 안 됩니다.
+
+
+7. 결과 이후 handback
+---------------------
+
+SUCCESS 또는 FAILURE를 보낸 뒤에도 바로 setpoint를 끊으면 안 됩니다.
+
+순서:
+  결과 발행
+  -> 제어팀 현재 위치 hold 계속 유지
+  -> BT가 자기 hold stream 복구
+  -> BT가 enable=false 발행
+  -> 제어팀 setpoint 중단
+
+BT는 SUCCESS일 때만 다음 귀환 시퀀스로 넘어갑니다.
+FAILURE면 recovery로 갑니다.
+
+
+8. Timeout
+----------
+
+ready timeout:
+  15초
+
+전체 구조 작업 timeout:
+  240초
+
+timeout이면 BT가 hold를 복구하고 enable=false를 보낸 뒤 FAILURE 처리합니다.
+
+
+9. 제어팀이 구현할 인터페이스
+----------------------------
+
+subscribe:
+  /krac/rescue_module/enable
+  std_msgs/msg/Bool
+
+publish:
+  /krac/rescue_module/ready
+  std_msgs/msg/Bool
+
+  /krac/rescue_module/result
+  std_msgs/msg/String
+
+
+10. 제어팀 수정 파일
+-------------------
+
+자기 제어 노드:
+  제어팀 ROS 2 패키지의 rescue_controller.cpp 또는 rescue_controller.py
+
+기존 비전 재사용:
+  ros2_ws/src/krac_vision/krac_vision/vision_tracker.py
+  ros2_ws/src/krac_interfaces/msg/TargetError.msg
+
+기존 정밀 제어 재사용:
+  ros2_ws/src/krac_control/src/precision_lander.cpp
+
+
+11. BT팀 수정 파일
+-----------------
+
+외부 구조 모듈 BT 노드:
+  ros2_ws/src/krac_control/include/krac_control/bt/bt_actions_basic.hpp
+  ros2_ws/src/krac_control/src/bt_actions_basic.cpp
+
+노드 등록:
+  ros2_ws/src/krac_control/src/bt_register.cpp
+
+호출 위치:
+  ros2_ws/src/krac_control/bt/krac_mission_bt_krac24_split.xml
+
+
+12. 제어팀이 건드리지 않는 부분
+-----------------------------
+
+HOME -> REP mission
+REP waypoint 번호
+귀환 mission 업로드
+귀환 waypoint
+MC -> FW 천이
+최종 착륙
+EmergencyRecovery
+GlobalMissionRecovery
+
+
+한 줄 요약
+-----------
+
+BT가 (-26.03, -31.41, 3.0 m)에 도착해 안정 hover하면 enable=true를 보냅니다.
+제어팀은 자기 setpoint를 먼저 시작한 뒤 ready=true를 보내고,
+구조물을 완전히 잡아 올려 안정화한 뒤 SUCCESS를 보냅니다.
+BT가 enable=false를 보낼 때까지 제어팀은 hold를 유지합니다.

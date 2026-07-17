@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>krac_gimbal</name>
+  <version>0.0.0</version>
+  <description>SIYI A8 mini gimbal control node (SIYI SDK over Ethernet/UDP)</description>
+  <maintainer email="kch@todo.todo">kch</maintainer>
+  <license>TODO: License declaration</license>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>krac_interfaces</depend>
+  <!-- camera_node (RTSP → /camera/image_raw) -->
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>python3-opencv</depend>
+
+  <!-- NOTE: siyi_sdk is not a rosdep. Install on the Jetson:
+       pip install siyi-sdk   (or) clone github.com/mzahana/siyi_sdk into PYTHONPATH -->
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,162 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  [bt_rescue_test] REP 구조 "제자리" 반복 테스트 BT.
+
+  전제: 기체를 REP(조난자/트레이) 바로 옆 ~1m 지점에 놓고 시작한다.
+        좌표를 지정하지 않고, YOLO/비전이 타깃을 추적해 정렬·하강한다.
+
+  흐름 (전부 제자리, 수평 이동은 비전 정렬만):
+    1) 제자리 5m 이륙   : OFFBOARD 진입 → arm → FlyToAltitude(5m, 현재 위치 유지)
+    2) 구조             : RescuePickupModule = MC 보장 → hover 안정 →
+                          ExecuteExternalRescueModule (비전 기반 정렬/하강/파지/재상승)
+    3) 다시 5m 상승     : FlyToAltitude(5m, 제자리) → hover 안정
+    4) 제자리 착륙      : AUTO.LAND → 착륙 판정 → disarm
+
+  * 좌표 비행(FlyToLocalPoint) 없음 — REP 가 바로 옆이라 비전 정렬로 충분.
+  * 안전: 큰 수평 이동을 BT 가 명령하지 않음(수직 + 비전 정렬만).
+  * 주의: 비전 정렬 정확도는 precision_lander 의 카메라 내부파라미터(fx_/fy_)에
+    좌우됨 → 실제 SIYI A8 로 맞춰야 정렬이 정확함(docs/REAL_HW_CHECKLIST.md H10).
+    그리퍼 파지는 아직 Gazebo 서보 기반(실기체 파지 X).
+-->
+<root BTCPP_format="4" main_tree_to_execute="RescueTest">
+
+  <!-- ===== 메인 테스트 트리 ===== -->
+  <BehaviorTree ID="RescueTest">
+    <ReactiveFallback name="RootReactiveFallback">
+      <Fallback name="TestOrRecover">
+        <ReactiveSequence name="GuardedRescueTest">
+          <!-- 안전 가드: 매 tick 재확인 -->
+          <Sequence name="SafetyGuard">
+            <IsMAVROSConnected max_state_age_sec="5.0" />
+            <IsBatterySafe sim_bypass="true" min_voltage="0.0" min_percentage="0.0" />
+          </Sequence>
+
+          <Sequence name="RescueTestSequence">
+            <!-- ===== 1) 제자리 5m 이륙 (VTOL 천이 없음) ===== -->
+            <SetMissionPhase phase="0" />
+            <StartOffboardSetpointStream mode="hold_current_pose" rate_hz="20" />
+            <Delay delay_msec="1500">
+              <AlwaysSuccess />
+            </Delay>
+            <IsOffboardSetpointStreamAlive min_rate_hz="10" stable_duration_sec="1.0" />
+            <!-- 필요시 아래 SetFlightMode(OFFBOARD) 와 ArmVehicle 순서를 바꿔도 됨(PX4 설정 의존) -->
+            <RetryUntilSuccessful num_attempts="3">
+              <SetFlightMode mode="OFFBOARD" timeout_sec="8.0" />
+            </RetryUntilSuccessful>
+            <RetryUntilSuccessful num_attempts="3">
+              <ArmVehicle arm="true" timeout_sec="5.0" />
+            </RetryUntilSuccessful>
+            <FlyToAltitude target_altitude_m="5.0" tolerance_m="0.5" max_climb_rate_mps="1.0" hold_latlon="true" timeout_sec="60.0" />
+
+            <!-- ===== 2) 구조 (제자리, YOLO/비전 트래킹 기반) ===== -->
+            <SetMissionPhase phase="2" />
+            <SubTree ID="RescuePickupModule" />
+
+            <!-- ===== 3) 다시 5m 상승 (제자리) ===== -->
+            <SetMissionPhase phase="9" />
+            <FlyToAltitude target_altitude_m="5.0" tolerance_m="0.5" max_climb_rate_mps="1.0" hold_latlon="true" timeout_sec="60.0" />
+            <WaitForHoverStable altitude_tolerance_m="0.7" max_vertical_speed_mps="0.3" max_horizontal_speed_mps="0.5" stable_duration_sec="1.5" timeout_sec="15.0" />
+
+            <!-- ===== 4) 제자리 착륙 ===== -->
+            <RetryUntilSuccessful num_attempts="3">
+              <SetFlightMode mode="AUTO.LAND" timeout_sec="8.0" />
+            </RetryUntilSuccessful>
+            <DetectLanding max_relative_altitude_m="0.4" max_vertical_speed_mps="0.3" timeout_sec="180.0" />
+            <Fallback name="FinalDisarmOrAlreadyDisarmed">
+              <Inverter>
+                <IsVehicleArmed />
+              </Inverter>
+              <Sequence>
+                <ArmVehicle arm="false" timeout_sec="10.0" />
+                <Inverter>
+                  <IsVehicleArmed />
+                </Inverter>
+              </Sequence>
+            </Fallback>
+            <SetMissionPhase phase="11" />
+          </Sequence>
+        </ReactiveSequence>
+        <!-- policy="land": 가드가 걸리면 제자리 착륙시킨다. 기본값 hold 는 착륙하지
+             않고 영구히 떠 있으므로 이 제자리 테스트에는 맞지 않는다. -->
+        <GlobalMissionRecovery reason="rescue_test_failure" policy="land" />
+      </Fallback>
+    </ReactiveFallback>
+  </BehaviorTree>
+
+  <!-- ===== 구조 하위트리 (제자리 버전: 좌표 비행 제거, 비전 정렬만) =====
+       원래 전체 BT의 RescuePickupModule 에서 FlyToLocalPoint(REP 좌표 이동) 만 뺐다.
+       나머지(MC 보장 → hover → 외부 rescue 모듈)는 그대로. 타깃 정렬/하강은
+       ExecuteExternalRescueModule → rescue_controller_placeholder 가 비전으로 수행.
+  -->
+  <BehaviorTree ID="RescuePickupModule">
+    <Sequence name="RescueInPlaceCycle">
+      <CommandVTOLTransition target_state="MC" timeout_sec="20.0" />
+      <WaitForHoverStable altitude_tolerance_m="0.7" max_vertical_speed_mps="0.3" max_horizontal_speed_mps="0.5" stable_duration_sec="1.5" timeout_sec="15.0" />
+      <ExecuteExternalRescueModule enable_topic="/krac/rescue_module/enable" ready_topic="/krac/rescue_module/ready" result_topic="/krac/rescue_module/result" request_rate_hz="2.0" handover_timeout_sec="30.0" execution_timeout_sec="260.0" handback_hold_sec="1.0" />
+    </Sequence>
+  </BehaviorTree>
+
+  <!-- BT viewer/Groot 용 노드 모델(사용 노드만). 등록은 C++ bt_register.cpp. -->
+  <TreeNodesModel>
+    <Condition ID="IsMAVROSConnected"><input_port name="max_state_age_sec" default="0.5"/></Condition>
+    <Condition ID="IsBatterySafe">
+      <input_port name="sim_bypass" default="true"/>
+      <input_port name="min_voltage" default="0.0"/>
+      <input_port name="min_percentage" default="0.0"/>
+    </Condition>
+    <Action ID="SetMissionPhase"><input_port name="phase" default="0"/></Action>
+    <Action ID="StartOffboardSetpointStream">
+      <input_port name="mode" default="hold_current_pose"/>
+      <input_port name="rate_hz" default="20"/>
+    </Action>
+    <Condition ID="IsOffboardSetpointStreamAlive">
+      <input_port name="min_rate_hz" default="10"/>
+      <input_port name="stable_duration_sec" default="1.0"/>
+    </Condition>
+    <Action ID="SetFlightMode">
+      <input_port name="mode" default="OFFBOARD"/>
+      <input_port name="timeout_sec" default="5.0"/>
+    </Action>
+    <Action ID="ArmVehicle">
+      <input_port name="arm" default="true"/>
+      <input_port name="timeout_sec" default="5.0"/>
+    </Action>
+    <Condition ID="IsVehicleArmed"/>
+    <Action ID="FlyToAltitude">
+      <input_port name="target_altitude_m" default="10.0"/>
+      <input_port name="tolerance_m" default="1.0"/>
+      <input_port name="max_climb_rate_mps" default="1.0"/>
+      <input_port name="hold_latlon" default="true"/>
+      <input_port name="timeout_sec" default="60.0"/>
+    </Action>
+    <Action ID="CommandVTOLTransition">
+      <input_port name="target_state" default="MC"/>
+      <input_port name="timeout_sec" default="20.0"/>
+    </Action>
+    <Action ID="WaitForHoverStable">
+      <input_port name="altitude_tolerance_m" default="0.5"/>
+      <input_port name="max_vertical_speed_mps" default="0.3"/>
+      <input_port name="max_horizontal_speed_mps" default="0.5"/>
+      <input_port name="stable_duration_sec" default="2.0"/>
+      <input_port name="timeout_sec" default="15.0"/>
+    </Action>
+    <Action ID="ExecuteExternalRescueModule">
+      <input_port name="enable_topic" default="/krac/rescue_module/enable"/>
+      <input_port name="ready_topic" default="/krac/rescue_module/ready"/>
+      <input_port name="result_topic" default="/krac/rescue_module/result"/>
+      <input_port name="request_rate_hz" default="2.0"/>
+      <input_port name="handover_timeout_sec" default="15.0"/>
+      <input_port name="execution_timeout_sec" default="240.0"/>
+      <input_port name="handback_hold_sec" default="1.0"/>
+    </Action>
+    <Action ID="DetectLanding">
+      <input_port name="max_relative_altitude_m" default="0.3"/>
+      <input_port name="max_vertical_speed_mps" default="0.2"/>
+      <input_port name="timeout_sec" default="45.0"/>
+    </Action>
+    <Action ID="GlobalMissionRecovery">
+      <input_port name="reason" default="unhandled_failure"/>
+      <input_port name="policy" default="hold"/>
+    </Action>
+  </TreeNodesModel>
+</root>

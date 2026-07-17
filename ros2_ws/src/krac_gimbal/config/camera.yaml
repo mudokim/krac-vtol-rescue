@@ -1,0 +1,21 @@
+# krac_gimbal / camera_node 파라미터
+# SIYI A8 mini RTSP 영상 → /camera/image_raw 브리지
+/camera_node:
+  ros__parameters:
+    # ---- RTSP 소스 (A8 mini 기본값) ----
+    rtsp_url: "rtsp://192.168.144.25:8554/main.264"
+    image_topic: "/camera/image_raw"   # krac_vision 트래커가 구독하는 토픽
+    frame_id: "camera"
+
+    # ---- 디코드 백엔드 ----
+    #   ffmpeg    : 이식성 높음(기본). PC/개발용으로 무난.
+    #   gstreamer : Jetson HW 디코드(nvv4l2decoder)로 저지연·저부하. 실기체 권장.
+    backend: "ffmpeg"
+    rtsp_transport: "tcp"   # tcp(손실에 강함) / udp(더 낮은 지연)
+    gst_latency_ms: 100     # gstreamer 지터버퍼(ms). 낮을수록 저지연
+    codec: "h264"           # main.264 = h264. sub 스트림이 h265면 "h265"
+    gst_pipeline: ""        # 직접 파이프라인 지정 시(비면 자동 생성)
+
+    # ---- 견고성 ----
+    reconnect_delay_sec: 2.0   # 연결 실패 시 재시도 간격
+    read_timeout_sec: 5.0      # 이 시간 동안 프레임 없으면 재연결

@@ -1,0 +1,38 @@
+krac_bt_runner:
+  ros__parameters:
+    bt_xml_path: ""
+    tick_rate_hz: 10.0
+    max_ticks: 0
+    print_bt_transitions: false
+
+    mavros_ns: "/mavros"
+    mission_dir: ""
+
+    # SITL/staged integration defaults. Turn these off only after wiring real devices.
+    sim_bypass: true
+    mission_upload_stub_success: false
+    gripper_stub_success: false
+
+    # Replace these with your mission coordinates before full route tests.
+    rep_point: [0.0, 0.0, 10.0]
+    home_point: [0.0, 0.0, 10.0]
+
+    align_p_gain: 0.005
+    max_align_speed: 0.5
+    descend_speed: 0.25
+
+    # krac24 vtol_fsm.cpp(proxy FSM) 이식: 단일 AUTO.MISSION 플랜에서 개입할 웨이포인트 시퀀스.
+    # way3.plan(9개 항목, seq 0~8, doJumpId 1~9)에 맞춰 조정됨:
+    #   seq0 TAKEOFF_HOME_DIRECT_RESCUE, seq1 REP_DIRECT,
+    #   seq2~6 WP5~1_BACK, seq7 HOME_RETURN,
+    #   seq8 HOME_VTOL_LAND(PX4 mission feasibility/safety net).
+    # REP 저고도/재상승은 PX4 mission item에서 제거했고, BT가 seq1/seq7에서만
+    # OFFBOARD+MC로 개입한다. 그 외 cruise/return leg는 고정익 AUTO.MISSION으로 유지한다.
+    rescue_wp_seq: 1
+    resume_wp_seq: 2
+    # drop_wp_seq: way3.plan에 드롭존 웨이포인트가 없어 현재 미사용.
+    # CruiseToDrop/DropOperation/ResumeAfterDrop은 krac_mission_bt_robust.xml의
+    # MissionSequence에서 제외되어 있음 (docs/krac24_integration.md 참고).
+    drop_wp_seq: 999
+    landing_wp_seq: 7
+    safe_ascend_alt: 30.0

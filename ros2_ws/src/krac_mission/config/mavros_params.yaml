@@ -1,0 +1,30 @@
+/**:
+  ros__parameters:
+    # [연결 설정]
+    # fcu_url: PX4 SITL과 연결하는 주소 (UDP)
+    # gcs_url: QGroundControl과 연결하는 주소 (중계)
+    fcu_url: "udp://:14540@127.0.0.1:14557"
+    gcs_url: "udp://@127.0.0.1"
+
+    # [시스템 ID]
+    target_system_id: 1
+    target_component_id: 1
+
+    # [플러그인 설정] 필요한 것만 활성화하여 부하를 줄임
+    plugin_allowlist:
+      - sys_status
+      - state
+      - imu
+      - local_position
+      - global_position
+      - setpoint_position
+      - setpoint_velocity
+      - setpoint_accel
+      - setpoint_raw
+      - command
+      - waypoint
+      - param
+
+    # [좌표계 설정]
+    # map(ENU) <-> local(NED) 변환
+    coordinate_system: "enu"
