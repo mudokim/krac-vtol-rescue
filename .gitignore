@@ -1,0 +1,71 @@
+# ROS2 build outputs
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+ros2_ws/src/*/build/
+ros2_ws/src/*/install/
+ros2_ws/src/*/log/
+
+# Runtime logs
+log/
+logs/
+*.log
+*.csv
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Large model files
+*.pt
+*.onnx
+*.engine
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Gazebo / PX4 runtime artifacts
+*.ulg
+*.bag
+*.db3
+
+# ROS2 build artifacts
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Runtime logs
+*.log
+*.bag
+*.db3
+
+# Large media
+*.mp4
+*.webm
+
+# ROS2 build artifacts
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Runtime logs
+*.log
+*.bag
+*.db3
+
+# Large media
+*.mp4
+*.webm
+
+# Local backup files
+*.backup_*
+*.backup_align_*
+*.backup
+
+# Local archives
+docs.zip
+
+# Local fix backups
+.bt_fix_backups/

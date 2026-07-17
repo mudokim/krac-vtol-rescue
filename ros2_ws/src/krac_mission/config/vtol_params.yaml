@@ -1,0 +1,15 @@
+/**:
+  ros__parameters:
+    # [규정] 천이 시 가속도 제한: 0.3G
+    # 0.3 * 9.8m/s^2 = 약 2.94 m/s^2
+    max_transition_accel: 2.94
+
+    # [규정] 임무 제한 시간: 25분 (초 단위)
+    mission_timeout_sec: 1500.0
+
+    # 비행 고도 설정 (미터)
+    takeoff_altitude: 15.0
+    cruise_altitude: 30.0
+
+    # VTOL 설정
+    transition_speed: 18.0  # m/s (고정익 천이 완료 속도)

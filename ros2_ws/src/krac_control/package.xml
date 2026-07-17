@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>krac_control</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="kch@todo.todo">kch</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <exec_depend>rclpy</exec_depend>
+  <depend>mavros_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>krac_interfaces</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>behaviortree_cpp_v3</depend>
+  <!-- gripper_adapter.py 가 런타임에 mission_interface/SetServoAngle 을 import 한다
+       (제어팀 payload_control 의 servo_serial_bridge 서비스 타입). -->
+  <exec_depend>mission_interface</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

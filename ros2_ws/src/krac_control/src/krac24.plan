@@ -1,0 +1,307 @@
+{
+  "fileType": "Plan",
+  "geoFence": {
+    "circles": [],
+    "polygons": [],
+    "version": 2
+  },
+  "groundStation": "QGroundControl",
+  "mission": {
+    "cruiseSpeed": 15,
+    "firmwareType": 12,
+    "globalPlanAltitudeMode": 0,
+    "hoverSpeed": 5,
+    "items": [
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 84,
+        "doJumpId": 1,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39757208732955,
+          8.546695111008095,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 2,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39753605772897,
+          8.54674279098946,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 3,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39571195772897,
+          8.547246029880686,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 4,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39759345772897,
+          8.549488840594973,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 5,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39753795772897,
+          8.546744362855302,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "autoContinue": true,
+        "command": 3000,
+        "doJumpId": 6,
+        "frame": 2,
+        "params": [
+          3,
+          0,
+          0,
+          0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 10,
+        "Altitude": 10,
+        "AltitudeMode": 1,
+        "autoContinue": false,
+        "command": 16,
+        "doJumpId": 7,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39768885772897,
+          8.545818292055744,
+          10
+        ],
+        "type": "SimpleItem",
+        "krac_note": "REP barrier: stop AUTO.MISSION at QGC #7 / MAVROS seq6. BT takes over here for YOLO precision landing and payload pickup."
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 8,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39753698249363,
+          8.546741280714864,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "autoContinue": true,
+        "command": 3000,
+        "doJumpId": 9,
+        "frame": 2,
+        "params": [
+          4,
+          0,
+          0,
+          0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 10,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39759315772897,
+          8.549472033721866,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 11,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.39569875772897,
+          8.547234543168845,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 30,
+        "Altitude": 30,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 12,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.397535757728974,
+          8.546742549163962,
+          30
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "autoContinue": true,
+        "command": 3000,
+        "doJumpId": 13,
+        "frame": 2,
+        "params": [
+          3,
+          0,
+          0,
+          0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 10,
+        "Altitude": 10,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 14,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          47.397969857728974,
+          8.546164586189423,
+          10
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": 0.0,
+        "Altitude": 0.0,
+        "AltitudeMode": 1,
+        "autoContinue": true,
+        "command": 85,
+        "doJumpId": 15,
+        "frame": 3,
+        "params": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          47.397969857728974,
+          8.546164586189423,
+          0.0
+        ],
+        "type": "SimpleItem",
+        "krac_note": "appended: MAV_CMD_NAV_VTOL_LAND safety-net so mission_feasibility_checker stops rejecting the mission for lacking a landing pattern (krac24.plan originally ends at the vertiport waypoint with no LAND item)"
+      }
+    ],
+    "plannedHomePosition": [
+      47.397971057728974,
+      8.546163739800146,
+      0.0
+    ],
+    "vehicleType": 20,
+    "version": 2
+  },
+  "rallyPoints": {
+    "points": [],
+    "version": 2
+  },
+  "version": 1
+}

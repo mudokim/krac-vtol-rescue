@@ -1,0 +1,50 @@
+/**:
+  ros__parameters:
+    # =====================================================================
+    #  실기체 MAVROS 설정 (bt_real). 시뮬용 mavros_params.yaml 의 대체본.
+    #  시뮬과의 유일한 실질 차이는 fcu_url(연결 엔드포인트) 이다.
+    #  /mavros/... 토픽·서비스 이름은 시뮬과 동일하므로 BT/제어 코드는 그대로다.
+    # =====================================================================
+
+    # [연결 설정] ★★★ 실기체에서 반드시 확인/수정할 값 ★★★
+    # fcu_url: 실제 비행 컨트롤러(PX4)와의 링크.
+    #   - Jetson UART(TELEM) 직결이면:  serial:///dev/ttyTHS1:921600
+    #   - USB 직결이면:                 serial:///dev/ttyACM0:57600
+    #   - 텔레메트리/네트워크 브리지 UDP면: udp://:14540@<FC_IP>:14557  등
+    #   기본값은 Jetson UART 가정. 실제 배선/보레이트에 맞게 반드시 바꿀 것.
+    #   시리얼 권한 필요: sudo usermod -aG dialout $USER  (재로그인)
+    fcu_url: "serial:///dev/ttyTHS1:921600"
+
+    # gcs_url: QGroundControl 로 MAVLink 중계(선택).
+    #   - 지상국으로 브로드캐스트: "udp-b://:14555@"
+    #   - 특정 GCS IP 로:          "udp://@192.168.144.10:14550"
+    #   - 중계 안 함:              "" (빈 문자열)
+    #   기본은 중계 없음. QGC 를 companion 네트워크에서 붙이려면 위 예시로 설정.
+    gcs_url: ""
+
+    # [시스템 ID] 실제 기체의 MAV_SYS_ID / MAV_COMP_ID 와 일치시킬 것(보통 1/1).
+    target_system_id: 1
+    target_component_id: 1
+
+    # [플러그인 설정] BT/제어가 실제 사용하는 것만 활성화(부하 감소).
+    #  사용처: state, local_position, global_position, setpoint_velocity,
+    #          setpoint_raw, setpoint_position, command, waypoint, param,
+    #          sys_status(→/mavros/battery, extended_state), imu.
+    plugin_allowlist:
+      - sys_status
+      - sys_time          # 실기체 시각 동기화(EKF 타임스탬프 정합)를 위해 권장
+      - state
+      - imu
+      - local_position
+      - global_position
+      - setpoint_position
+      - setpoint_velocity
+      - setpoint_accel
+      - setpoint_raw
+      - command
+      - waypoint
+      - param
+      - rc_io             # 실기체 RC/failsafe 상태 확인용(선택)
+
+    # [좌표계 설정] map(ENU) <-> local(NED) 변환. 코드가 ENU 기준이라 유지.
+    coordinate_system: "enu"

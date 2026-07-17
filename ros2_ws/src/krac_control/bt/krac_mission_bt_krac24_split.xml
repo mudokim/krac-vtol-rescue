@@ -1,0 +1,426 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root BTCPP_format="4" main_tree_to_execute="KRAC_Mission_BT">
+  <!-- [KRAC-KO] 메인 임무 트리. 시작부터 최종 착륙까지 전체 시나리오를 실행한다. -->
+  <BehaviorTree ID="KRAC_Mission_BT">
+    <ReactiveFallback name="RootReactiveFallback">
+      <!-- [KRAC-KO] Sequence: 자식 노드를 위에서 아래로 실행한다. 하나라도 FAILURE면 즉시 FAILURE다. | 구현/수정: BehaviorTree.CPP 기본 제어 노드 -->
+      <Sequence name="EmergencyBranch">
+        <IsEmergencyDetected sources="px4_failsafe,mavros_loss,gps_loss,battery_critical,manual_abort,geofence" />
+        <EmergencyRecovery policy="hold_if_possible_else_px4_failsafe" />
+      </Sequence>
+      <!-- [KRAC-KO] Fallback: 자식을 위에서 아래로 시도한다. 하나가 SUCCESS면 즉시 SUCCESS다. | 구현/수정: BehaviorTree.CPP 기본 제어 노드 -->
+      <Fallback name="MissionOrHoldRecovery">
+        <ReactiveSequence name="SafetyGuardedMission">
+          <!-- [KRAC-KO] Sequence: 자식 노드를 위에서 아래로 실행한다. 하나라도 FAILURE면 즉시 FAILURE다. | 구현/수정: BehaviorTree.CPP 기본 제어 노드 -->
+          <Sequence name="SafetyGuard">
+            <IsMAVROSConnected max_state_age_sec="5.0" />
+            <IsBatterySafe sim_bypass="true" min_voltage="0.0" min_percentage="0.0" />
+          </Sequence>
+          <!-- [KRAC-KO] 전체 정상 임무 순서: 구조 지점 이동 → 구조/placeholder → 귀환 → 최종 착륙 -->
+          <Sequence name="MissionSequenceSplit">
+            <!-- [KRAC-KO] 초기 구조 미션 업로드, arm, AUTO.MISSION 시작 -->
+            <Sequence name="StartRescueLeg">
+              <!-- [KRAC-KO] ClearMissionPlan: PX4에 남아 있는 기존 미션을 삭제한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: optional=true (true이면 서비스가 없어도 실패시키지 않는다.) -->
+              <ClearMissionPlan optional="true" />
+              <!-- [KRAC-KO] RetryUntilSuccessful: 자식이 SUCCESS가 될 때까지 지정 횟수만큼 재시도한다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: num_attempts=2 (최대 시도 횟수) -->
+              <RetryUntilSuccessful num_attempts="2">
+                <!-- [KRAC-KO] rescue-leg plan 업로드와 업로드 검증 -->
+                <Sequence name="LoadRescueLeg">
+                  <!-- [KRAC-KO] UploadMissionPlan: .plan 파일을 PX4에 업로드한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp / mission_context.cpp / mission_loader.py | 현재 파라미터: plan_path=krac24_rescue_leg.plan (업로드할 .plan 파일명); mission_name=rescue_leg (BT 내부 미션 이름); expected_end=REP (목적지 검증값) -->
+                  <UploadMissionPlan plan_path="krac24_rescue_leg.plan" mission_name="rescue_leg" expected_end="REP" />
+                  <!-- [KRAC-KO] IsMissionUploaded: 요청한 미션이 정상 업로드됐는지 확인한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_conditions.cpp | 현재 파라미터: mission_name=rescue_leg (검증할 미션 이름); expected_end=REP (검증할 목적지) -->
+                  <IsMissionUploaded mission_name="rescue_leg" expected_end="REP" />
+                </Sequence>
+              </RetryUntilSuccessful>
+              <!-- [KRAC-KO] SetMissionPhase: 현재 임무 단계를 숫자로 발행한다. 로그/상태 표시용이다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp / mission_context.cpp | 현재 파라미터: phase=0 (임무 단계 번호) -->
+              <SetMissionPhase phase="0" />
+              <!-- [KRAC-KO] RetryUntilSuccessful: 자식이 SUCCESS가 될 때까지 지정 횟수만큼 재시도한다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: num_attempts=3 (최대 시도 횟수) -->
+              <RetryUntilSuccessful num_attempts="3">
+                <!-- [KRAC-KO] ArmVehicle: 기체를 arm 또는 disarm 상태로 전환하고 실제 상태 변경까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: arm=true (true=arm, false=disarm); timeout_sec=5.0 (최대 대기시간(초)) -->
+                <ArmVehicle arm="true" timeout_sec="5.0" />
+              </RetryUntilSuccessful>
+              <!-- [KRAC-KO] RetryUntilSuccessful: 자식이 SUCCESS가 될 때까지 지정 횟수만큼 재시도한다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: num_attempts=3 (최대 시도 횟수) -->
+              <RetryUntilSuccessful num_attempts="3">
+                <!-- [KRAC-KO] SetFlightMode: PX4 비행 모드를 변경하고 실제 모드 변경까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: mode=AUTO.MISSION (AUTO.MISSION, OFFBOARD, AUTO.LAND 등); timeout_sec=8.0 (최대 대기시간(초)) -->
+                <SetFlightMode mode="AUTO.MISSION" timeout_sec="8.0" />
+              </RetryUntilSuccessful>
+            </Sequence>
+            <!-- [KRAC-KO] SetMissionPhase: 현재 임무 단계를 숫자로 발행한다. 로그/상태 표시용이다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp / mission_context.cpp | 현재 파라미터: phase=1 (임무 단계 번호) -->
+            <SetMissionPhase phase="1" />
+            <!-- [KRAC-KO] WaitForWaypointReached: 지정 waypoint sequence 도달까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp | 현재 파라미터: seq=6 (기다릴 waypoint 번호); match=after_start (exact 또는 at_or_after); timeout_sec=600.0 (최대 대기시간(초)) -->
+            <WaitForWaypointReached seq="6" match="after_start" timeout_sec="600.0" />
+            <!-- [KRAC-KO] REP 도착 후 AUTO.MISSION에서 OFFBOARD로 안전하게 제어권 전환 -->
+            <Sequence name="TakeOverAtREP">
+              <!-- [KRAC-KO] StartOffboardSetpointStream: OFFBOARD 진입 전 현재 위치 setpoint를 연속 발행한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp / mission_context.cpp | 현재 파라미터: mode=hold_current_pose (hold_current_pose=현재 위치 유지); rate_hz=20 (발행 주파수(Hz)) -->
+              <StartOffboardSetpointStream mode="hold_current_pose" rate_hz="20" />
+              <!-- [KRAC-KO] Delay: 자식 실행 전 지정 시간만큼 기다린다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: delay_msec=1500 (대기시간(ms)) -->
+              <Delay delay_msec="1500">
+                <!-- [KRAC-KO] AlwaysSuccess: 항상 SUCCESS를 반환한다. Delay의 빈 자식용으로 주로 사용한다. | 구현/수정: BehaviorTree.CPP 기본 노드 -->
+                <AlwaysSuccess />
+              </Delay>
+              <!-- [KRAC-KO] IsOffboardSetpointStreamAlive: OFFBOARD setpoint가 충분한 주파수로 안정 발행 중인지 확인한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_conditions.cpp / mission_context.cpp | 현재 파라미터: min_rate_hz=10 (최소 허용 주파수); stable_duration_sec=1.0 (연속 유지시간(초)) -->
+              <IsOffboardSetpointStreamAlive min_rate_hz="10" stable_duration_sec="1.0" />
+              <!-- [KRAC-KO] RetryUntilSuccessful: 자식이 SUCCESS가 될 때까지 지정 횟수만큼 재시도한다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: num_attempts=3 (최대 시도 횟수) -->
+              <RetryUntilSuccessful num_attempts="3">
+                <!-- [KRAC-KO] SetFlightMode: PX4 비행 모드를 변경하고 실제 모드 변경까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: mode=OFFBOARD (AUTO.MISSION, OFFBOARD, AUTO.LAND 등); timeout_sec=8.0 (최대 대기시간(초)) -->
+                <SetFlightMode mode="OFFBOARD" timeout_sec="8.0" />
+              </RetryUntilSuccessful>
+              <!-- [KRAC-KO] ClearMissionPlan: PX4에 남아 있는 기존 미션을 삭제한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: optional=true (true이면 서비스가 없어도 실패시키지 않는다.) -->
+              <ClearMissionPlan optional="true" />
+            </Sequence>
+            <!-- [KRAC-KO] SubTree: 같은 XML 안의 다른 BehaviorTree ID를 호출한다. | 구현/수정: BehaviorTree.CPP 기본 서브트리 노드 | 현재 파라미터: ID=RescuePickupModule (호출할 BehaviorTree ID) -->
+            <SubTree ID="RescuePickupModule" />
+            <!-- [KRAC-KO] SetMissionPhase: 현재 임무 단계를 숫자로 발행한다. 로그/상태 표시용이다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp / mission_context.cpp | 현재 파라미터: phase=9 (임무 단계 번호) -->
+            <SetMissionPhase phase="9" />
+            <!-- [KRAC-KO] RetryUntilSuccessful: 자식이 SUCCESS가 될 때까지 지정 횟수만큼 재시도한다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: num_attempts=2 (최대 시도 횟수) -->
+            <RetryUntilSuccessful num_attempts="2">
+              <!-- [KRAC-KO] 귀환용 return-leg plan 업로드와 검증 -->
+              <Sequence name="UploadReturnLeg">
+                <!-- [KRAC-KO] ClearMissionPlan: PX4에 남아 있는 기존 미션을 삭제한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: optional=true (true이면 서비스가 없어도 실패시키지 않는다.) -->
+                <ClearMissionPlan optional="true" />
+                <!-- [KRAC-KO] UploadMissionPlan: .plan 파일을 PX4에 업로드한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp / mission_context.cpp / mission_loader.py | 현재 파라미터: plan_path=krac24_return_leg.plan (업로드할 .plan 파일명); mission_name=return_leg (BT 내부 미션 이름); expected_end=LANDING (목적지 검증값) -->
+                <UploadMissionPlan plan_path="krac24_return_leg.plan" mission_name="return_leg" expected_end="LANDING" />
+                <!-- [KRAC-KO] IsMissionUploaded: 요청한 미션이 정상 업로드됐는지 확인한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_conditions.cpp | 현재 파라미터: mission_name=return_leg (검증할 미션 이름); expected_end=LANDING (검증할 목적지) -->
+                <IsMissionUploaded mission_name="return_leg" expected_end="LANDING" />
+              </Sequence>
+            </RetryUntilSuccessful>
+            <!-- [KRAC-KO] RetryUntilSuccessful: 자식이 SUCCESS가 될 때까지 지정 횟수만큼 재시도한다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: num_attempts=3 (최대 시도 횟수) -->
+            <RetryUntilSuccessful num_attempts="3">
+              <!-- [KRAC-KO] SetFlightMode: PX4 비행 모드를 변경하고 실제 모드 변경까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: mode=AUTO.MISSION (AUTO.MISSION, OFFBOARD, AUTO.LAND 등); timeout_sec=8.0 (최대 대기시간(초)) -->
+              <SetFlightMode mode="AUTO.MISSION" timeout_sec="8.0" />
+            </RetryUntilSuccessful>
+            <!-- [KRAC-KO] WaitForWaypointReached: 지정 waypoint sequence 도달까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp | 현재 파라미터: seq=1 (기다릴 waypoint 번호); match=after_start (exact 또는 at_or_after); timeout_sec=180.0 (최대 대기시간(초)) -->
+            <WaitForWaypointReached seq="1" match="after_start" timeout_sec="180.0" />
+            <!-- [KRAC-KO] 귀환 방향 정렬 후 MC에서 FW로 직접 천이 -->
+            <Sequence name="AlignAndTransitionToFW">
+              <!-- [KRAC-KO] StartOffboardSetpointStream: OFFBOARD 진입 전 현재 위치 setpoint를 연속 발행한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp / mission_context.cpp | 현재 파라미터: mode=hold_current_pose (hold_current_pose=현재 위치 유지); rate_hz=20 (발행 주파수(Hz)) -->
+              <StartOffboardSetpointStream mode="hold_current_pose" rate_hz="20" />
+              <!-- [KRAC-KO] Delay: 자식 실행 전 지정 시간만큼 기다린다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: delay_msec=1500 (대기시간(ms)) -->
+              <Delay delay_msec="1500">
+                <!-- [KRAC-KO] AlwaysSuccess: 항상 SUCCESS를 반환한다. Delay의 빈 자식용으로 주로 사용한다. | 구현/수정: BehaviorTree.CPP 기본 노드 -->
+                <AlwaysSuccess />
+              </Delay>
+              <!-- [KRAC-KO] IsOffboardSetpointStreamAlive: OFFBOARD setpoint가 충분한 주파수로 안정 발행 중인지 확인한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_conditions.cpp / mission_context.cpp | 현재 파라미터: min_rate_hz=10 (최소 허용 주파수); stable_duration_sec=1.0 (연속 유지시간(초)) -->
+              <IsOffboardSetpointStreamAlive min_rate_hz="10" stable_duration_sec="1.0" />
+              <!-- [KRAC-KO] RetryUntilSuccessful: 자식이 SUCCESS가 될 때까지 지정 횟수만큼 재시도한다. | 구현/수정: BehaviorTree.CPP 기본 노드 | 현재 파라미터: num_attempts=3 (최대 시도 횟수) -->
+              <RetryUntilSuccessful num_attempts="3">
+                <!-- [KRAC-KO] SetFlightMode: PX4 비행 모드를 변경하고 실제 모드 변경까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: mode=OFFBOARD (AUTO.MISSION, OFFBOARD, AUTO.LAND 등); timeout_sec=8.0 (최대 대기시간(초)) -->
+                <SetFlightMode mode="OFFBOARD" timeout_sec="8.0" />
+              </RetryUntilSuccessful>
+              <!-- [KRAC-KO] WaitForHoverStable: 고도와 속도가 일정 시간 안정적인지 확인한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_mission.cpp | 현재 파라미터: altitude_tolerance_m=2.0 (고도 허용 변화량(m)); max_vertical_speed_mps=0.6 (최대 수직속도 절댓값(m/s)); max_horizontal_speed_mps=1.0 (최대 수평속도(m/s)); stable_duration_sec=1.0 (안정 유지시간(초)); timeout_sec=15.0 (최대 대기시간(초)) -->
+              <WaitForHoverStable altitude_tolerance_m="2.0" max_vertical_speed_mps="0.6" max_horizontal_speed_mps="1.0" stable_duration_sec="1.0" timeout_sec="15.0" />
+              <!-- [KRAC-KO] AlignHeadingToWaypoint: 다음 waypoint 방향으로 yaw를 정렬한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp | 현재 파라미터: seq=3 (방향 계산 대상 waypoint); tolerance_rad=0.20 (허용 yaw 오차(rad)); timeout_sec=30.0 (최대 대기시간(초)) -->
+              <AlignHeadingToWaypoint seq="3" tolerance_rad="0.20" timeout_sec="30.0" />
+              <!-- [KRAC-KO] CommandVTOLTransition: VTOL을 멀티콥터(MC) 또는 고정익(FW) 상태로 천이한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: target_state=FW (MC 또는 FW); timeout_sec=45.0 (천이 최대 대기시간(초)) -->
+              <CommandVTOLTransition target_state="FW" timeout_sec="45.0" />
+              <!-- [KRAC-KO] SetMissionCurrentWaypoint: AUTO.MISSION이 시작할 현재 waypoint 번호를 지정한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp | 현재 파라미터: seq=3 (시작 waypoint 번호); timeout_sec=8.0 (최대 대기시간(초)) -->
+              <SetMissionCurrentWaypoint seq="3" timeout_sec="8.0" />
+              <!-- [KRAC-KO] SetFlightMode: PX4 비행 모드를 변경하고 실제 모드 변경까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: mode=AUTO.MISSION (AUTO.MISSION, OFFBOARD, AUTO.LAND 등); timeout_sec=8.0 (최대 대기시간(초)) -->
+              <SetFlightMode mode="AUTO.MISSION" timeout_sec="8.0" />
+            </Sequence>
+            <!-- [KRAC-KO] WaitForWaypointReached: 지정 waypoint sequence 도달까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp | 현재 파라미터: seq=7 (기다릴 waypoint 번호); match=after_start (exact 또는 at_or_after); timeout_sec=600.0 (최대 대기시간(초)) -->
+            <WaitForWaypointReached seq="7" match="after_start" timeout_sec="600.0" />
+            <!-- [KRAC-KO] SetMissionPhase: 현재 임무 단계를 숫자로 발행한다. 로그/상태 표시용이다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp / mission_context.cpp | 현재 파라미터: phase=10 (임무 단계 번호) -->
+            <SetMissionPhase phase="10" />
+            <!-- [KRAC-KO] DetectLanding: PX4 landed_state 또는 저고도·저수직속도로 착륙 완료를 판정한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_mission.cpp | 현재 파라미터: max_relative_altitude_m=0.4 (착륙 인정 최대 상대고도(m)); max_vertical_speed_mps=0.3 (착륙 인정 최대 수직속도(m/s)); timeout_sec=180.0 (최대 대기시간(초)) -->
+            <DetectLanding max_relative_altitude_m="0.4" max_vertical_speed_mps="0.3" timeout_sec="180.0" />
+            <!-- [KRAC-KO] 최종 착륙 후 disarm 또는 이미 disarm 상태 인정 -->
+            <Fallback name="FinalDisarmOrAlreadyDisarmed">
+              <Inverter>
+                <IsVehicleArmed />
+              </Inverter>
+              <!-- [KRAC-KO] Sequence: 자식 노드를 위에서 아래로 실행한다. 하나라도 FAILURE면 즉시 FAILURE다. | 구현/수정: BehaviorTree.CPP 기본 제어 노드 -->
+              <Sequence>
+                <!-- [KRAC-KO] ArmVehicle: 기체를 arm 또는 disarm 상태로 전환하고 실제 상태 변경까지 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: arm=false (true=arm, false=disarm); timeout_sec=10.0 (최대 대기시간(초)) -->
+                <ArmVehicle arm="false" timeout_sec="10.0" />
+                <Inverter>
+                  <IsVehicleArmed />
+                </Inverter>
+              </Sequence>
+            </Fallback>
+            <!-- [KRAC-KO] SetMissionPhase: 현재 임무 단계를 숫자로 발행한다. 로그/상태 표시용이다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp / mission_context.cpp | 현재 파라미터: phase=11 (임무 단계 번호) -->
+            <SetMissionPhase phase="11" />
+          </Sequence>
+        </ReactiveSequence>
+        <GlobalMissionRecovery reason="unhandled_mission_or_guard_failure" />
+      </Fallback>
+    </ReactiveFallback>
+  </BehaviorTree>
+  <!-- [KRAC-KO] 제어팀 교체 구간. 현재 placeholder 수정 파일: ros2_ws/src/krac_control/src/rescue_controller_placeholder.py -->
+  <BehaviorTree ID="RescuePickupModule">
+    <!-- [KRAC-KO] 현재 제어팀 대체 구간: 구조 상공 이동 후 placeholder 결과 대기 -->
+    <Sequence name="RescuePlaceholderCycle">
+      <!-- [KRAC-KO] CommandVTOLTransition: VTOL을 멀티콥터(MC) 또는 고정익(FW) 상태로 천이한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp | 현재 파라미터: target_state=MC (MC 또는 FW); timeout_sec=20.0 (천이 최대 대기시간(초)) -->
+      <CommandVTOLTransition target_state="MC" timeout_sec="20.0" />
+      <!-- [KRAC-KO] FlyToLocalPoint: OFFBOARD 위치 setpoint로 로컬 ENU 좌표까지 이동한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_precision.cpp | 현재 파라미터: x_m=-26.03 (동쪽 목표좌표(m)); y_m=-31.41 (북쪽 목표좌표(m)); z_m=2.0 (목표고도(m)); xy_tolerance_m=0.5 (수평 허용오차(m)); z_tolerance_m=0.45 (고도 허용오차(m)); max_xy_speed_mps=1.2 (최대 수평속도(m/s)); max_z_speed_mps=0.7 (최대 수직속도(m/s)); timeout_sec=60.0 (최대 대기시간(초)) -->
+      <FlyToLocalPoint x_m="-26.03" y_m="-31.41" z_m="2.0" xy_tolerance_m="0.5" z_tolerance_m="0.45" max_xy_speed_mps="1.2" max_z_speed_mps="0.7" timeout_sec="60.0" />
+      <!-- [KRAC-KO] WaitForHoverStable: 고도와 속도가 일정 시간 안정적인지 확인한다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_mission.cpp | 현재 파라미터: altitude_tolerance_m=0.7 (고도 허용 변화량(m)); max_vertical_speed_mps=0.3 (최대 수직속도 절댓값(m/s)); max_horizontal_speed_mps=0.5 (최대 수평속도(m/s)); stable_duration_sec=1.5 (안정 유지시간(초)); timeout_sec=15.0 (최대 대기시간(초)) -->
+      <WaitForHoverStable altitude_tolerance_m="0.7" max_vertical_speed_mps="0.3" max_horizontal_speed_mps="0.5" stable_duration_sec="1.5" timeout_sec="15.0" />
+      <!-- [KRAC-KO] ExecuteExternalRescueModule: 외부 구조 제어 노드에 제어권을 넘기고 ready/result 신호를 기다린다. | 구현/수정: ros2_ws/src/krac_control/src/bt_actions_basic.cpp / rescue_controller_placeholder.py | 현재 파라미터: enable_topic=/krac/rescue_module/enable (BT가 시작/종료를 알리는 Bool 토픽); ready_topic=/krac/rescue_module/ready (외부 노드 준비완료 Bool 토픽); result_topic=/krac/rescue_module/result (SUCCESS 또는 FAILURE:reason String 토픽); request_rate_hz=2.0 (enable 반복 발행 주파수); handover_timeout_sec=30.0 (ready 최대 대기시간(초)); execution_timeout_sec=260.0 (전체 구조 최대 대기시간(초)); handback_hold_sec=1.0 (BT hold 복구 후 겹쳐 유지하는 시간(초)) -->
+      <ExecuteExternalRescueModule enable_topic="/krac/rescue_module/enable" ready_topic="/krac/rescue_module/ready" result_topic="/krac/rescue_module/result" request_rate_hz="2.0" handover_timeout_sec="30.0" execution_timeout_sec="260.0" handback_hold_sec="1.0" />
+    </Sequence>
+  </BehaviorTree>
+  <TreeNodesModel>
+    <Condition ID="IsEmergencyDetected" editable="true">
+      <input_port name="sources" default="px4_failsafe,mavros_loss,gps_loss,battery_critical,manual_abort,geofence">비상으로 간주할 신호 목록</input_port>
+    </Condition>
+    <Action ID="EmergencyRecovery" editable="true">
+      <input_port name="policy" default="hold_if_possible_else_px4_failsafe">비상 상황 처리 정책</input_port>
+    </Action>
+    <Action ID="GlobalMissionRecovery" editable="true">
+      <input_port name="reason" default="unhandled_failure">전역 미션 실패 복구 사유</input_port>
+    </Action>
+    <Condition ID="IsMAVROSConnected" editable="true">
+      <input_port name="max_state_age_sec" default="0.5">/mavros/state 최신성 허용 시간</input_port>
+    </Condition>
+    <Condition ID="IsGPSReady" editable="true">
+      <input_port name="min_fix_status" default="0">GPS fix 최소 상태</input_port>
+    </Condition>
+    <Condition ID="IsGlobalPositionFresh" editable="true">
+      <input_port name="max_age_sec" default="0.5">global position 메시지 최신성 허용 시간</input_port>
+    </Condition>
+    <Condition ID="IsBatterySafe" editable="true">
+      <input_port name="sim_bypass" default="true">시뮬레이션에서 배터리 체크 우회 여부</input_port>
+      <input_port name="min_voltage" default="0.0">최소 전압</input_port>
+      <input_port name="min_percentage" default="0.0">최소 잔량 비율</input_port>
+    </Condition>
+    <Action ID="StartOffboardSetpointStream" editable="true">
+      <input_port name="mode" default="hold_current_pose">setpoint stream 방식</input_port>
+      <input_port name="rate_hz" default="20">publish rate</input_port>
+    </Action>
+    <Condition ID="IsOffboardSetpointStreamAlive" editable="true">
+      <input_port name="min_rate_hz" default="10">최소 setpoint publish rate</input_port>
+      <input_port name="stable_duration_sec" default="1.0">최소 연속 유지 시간</input_port>
+    </Condition>
+    <Action ID="SetFlightMode" editable="true">
+      <input_port name="mode" default="OFFBOARD">PX4 flight mode</input_port>
+      <input_port name="timeout_sec" default="5.0">모드 요청 timeout</input_port>
+    </Action>
+    <Condition ID="IsFlightMode" editable="true">
+      <input_port name="mode" default="OFFBOARD">확인할 PX4 flight mode</input_port>
+    </Condition>
+    <Action ID="ArmVehicle" editable="true">
+      <input_port name="arm" default="true">arm 또는 disarm 요청</input_port>
+      <input_port name="timeout_sec" default="5.0">arming timeout</input_port>
+    </Action>
+    <Condition ID="IsVehicleArmed" editable="true" />
+    <Condition ID="IsVTOLStateMC" editable="true" />
+    <Action ID="EnsureFixedWingCruise" editable="true">
+      <input_port name="transition_source" default="mission_plan_or_command">FW 전환 출처</input_port>
+      <input_port name="timeout_sec" default="45.0">FW 전환 확인 timeout</input_port>
+    </Action>
+    <Action ID="CommandVTOLTransition" editable="true">
+      <input_port name="target_state" default="MC">목표 VTOL 상태</input_port>
+      <input_port name="timeout_sec" default="20.0">전환 명령 timeout</input_port>
+    </Action>
+    <Action ID="FlyToAltitude" editable="true">
+      <input_port name="target_altitude_m" default="10.0">목표 상대 고도</input_port>
+      <input_port name="tolerance_m" default="1.0">허용 고도 오차</input_port>
+      <input_port name="max_climb_rate_mps" default="1.0">최대 상승률</input_port>
+      <input_port name="hold_latlon" default="true">현재 lat/lon 유지 여부</input_port>
+      <input_port name="timeout_sec" default="60.0">고도 도달 timeout</input_port>
+      <input_port name="mode" default="near">near / at_or_below / at_or_above</input_port>
+    </Action>
+    <Condition ID="IsAltitudeReached" editable="true">
+      <input_port name="target_altitude_m" default="10.0">목표 상대 고도</input_port>
+      <input_port name="tolerance_m" default="0.5">허용 고도 오차</input_port>
+      <input_port name="mode" default="near">near / at_or_below / at_or_above</input_port>
+    </Condition>
+    <Action ID="WaitForHoverStable" editable="true">
+      <input_port name="altitude_tolerance_m" default="0.5">허용 고도 오차</input_port>
+      <input_port name="max_vertical_speed_mps" default="0.3">최대 수직 속도</input_port>
+      <input_port name="max_horizontal_speed_mps" default="0.5">최대 수평 속도</input_port>
+      <input_port name="stable_duration_sec" default="2.0">안정 유지 시간</input_port>
+      <input_port name="timeout_sec" default="15.0">최대 대기시간(초)</input_port>
+    </Action>
+    <Action ID="FlyToLocalPoint" editable="true">
+      <input_port name="x_m" default="0.0">홈 기준 로컬 ENU east 오프셋(m)</input_port>
+      <input_port name="y_m" default="0.0">홈 기준 로컬 ENU north 오프셋(m)</input_port>
+      <input_port name="z_m" default="10.0">목표 상대 고도(m)</input_port>
+      <input_port name="xy_tolerance_m" default="2.0">허용 수평 오차</input_port>
+      <input_port name="z_tolerance_m" default="2.0">허용 고도 오차</input_port>
+      <input_port name="max_xy_speed_mps" default="4.0">최대 수평 속도</input_port>
+      <input_port name="max_z_speed_mps" default="1.0">최대 수직 속도</input_port>
+      <input_port name="timeout_sec" default="45.0">도달 timeout</input_port>
+    </Action>
+    <Action ID="ClearMissionPlan" editable="true">
+      <input_port name="optional" default="true">실패해도 무시 가능한지 여부</input_port>
+    </Action>
+    <Action ID="UploadMissionPlan" editable="true">
+      <input_port name="plan_path" default="krac24.plan">업로드할 mission plan 경로</input_port>
+      <input_port name="mission_name" default="full_route">mission 이름</input_port>
+      <input_port name="expected_end" default="LANDING">예상 종료 지점</input_port>
+    </Action>
+    <Condition ID="IsMissionUploaded" editable="true">
+      <input_port name="mission_name" default="full_route">확인할 mission 이름</input_port>
+      <input_port name="expected_end" default="LANDING">예상 종료 지점</input_port>
+    </Condition>
+    <Condition ID="IsRescueCompleted" editable="true" />
+    <Action ID="EnterREPStation" editable="true">
+      <input_port name="approach_radius_m" default="120.0">REP 접근 감지 반경</input_port>
+      <input_port name="station_radius_m" default="30.0">REP 작업 구역 반경</input_port>
+      <input_port name="max_cross_track_m" default="60.0">허용 cross-track 오차</input_port>
+      <input_port name="timeout_sec" default="300.0">REP 접근 timeout</input_port>
+    </Action>
+    <Condition ID="IsAtREPRegion" editable="true">
+      <input_port name="radius_m" default="30.0">REP 작업 구역 반경</input_port>
+      <input_port name="max_altitude_error_m" default="20.0">허용 고도 오차</input_port>
+    </Condition>
+    <Action ID="EnterHomeStation" editable="true">
+      <input_port name="approach_radius_m" default="120.0">Home 접근 감지 반경</input_port>
+      <input_port name="station_radius_m" default="30.0">Home 작업 구역 반경</input_port>
+      <input_port name="max_cross_track_m" default="60.0">허용 cross-track 오차</input_port>
+      <input_port name="timeout_sec" default="300.0">Home 접근 timeout</input_port>
+    </Action>
+    <Condition ID="IsAtHomeRegion" editable="true">
+      <input_port name="radius_m" default="30.0">Home 작업 구역 반경</input_port>
+      <input_port name="max_altitude_error_m" default="20.0">허용 고도 오차</input_port>
+    </Condition>
+    <Condition ID="IsWaypointReached" editable="true">
+      <input_port name="seq" default="0">확인할 웨이포인트 시퀀스 번호</input_port>
+    </Condition>
+    <Action ID="WaitForWaypointReached" editable="true">
+      <input_port name="seq" default="0">대기할 웨이포인트 시퀀스 번호</input_port>
+      <input_port name="timeout_sec" default="300.0">최대 대기 시간</input_port>
+      <input_port name="match" default="at_or_after">at_or_after, exact, after_start</input_port>
+    </Action>
+    <Action ID="SetMissionCurrentWaypoint" editable="true">
+      <input_port name="seq" default="0">현재 미션 아이템으로 지정할 시퀀스 번호</input_port>
+      <input_port name="timeout_sec" default="5.0">서비스 timeout</input_port>
+    </Action>
+    <Action ID="AlignHeadingToWaypoint" editable="true">
+      <input_port name="seq" default="0">기수를 정렬할 목표 웨이포인트</input_port>
+      <input_port name="tolerance_rad" default="0.1">허용 헤딩 오차</input_port>
+      <input_port name="timeout_sec" default="8.0">정렬 timeout</input_port>
+    </Action>
+    <Action ID="EnablePrecisionLander" editable="true">
+      <input_port name="enable" default="true">precision_lander 활성/비활성</input_port>
+    </Action>
+    <Condition ID="IsPrecisionTargetDetected" editable="true">
+      <input_port name="max_age_sec" default="0.5">TargetError 최신성 허용 시간</input_port>
+    </Condition>
+    <Action ID="WaitForPrecisionTarget" editable="true">
+      <input_port name="max_age_sec" default="2.0">TargetError 최신성 허용 시간</input_port>
+      <input_port name="timeout_sec" default="30.0">타겟 획득 대기 제한 시간</input_port>
+    </Action>
+    <Action ID="PrecisionLandOnTarget" editable="true">
+      <input_port name="target_altitude_m" default="0.3">정밀착륙 목표 고도</input_port>
+      <input_port name="timeout_sec" default="60.0">착륙 timeout</input_port>
+      <input_port name="target_fresh_max_age_sec" default="3.0">TargetError 최신성 허용 시간</input_port>
+      <input_port name="close_range_lock_alt_m" default="2.0">이 고도 이하에서 타겟을 놓치면 실패시키지 않고 마지막 정렬을 신뢰해 blind descent로 계속 진행(근접 시 비전 인식 한계 대응)</input_port>
+    </Action>
+    <Action ID="SetMissionPhase" editable="true">
+      <input_port name="phase" default="0">krac_interfaces/FlightPhase 값</input_port>
+    </Action>
+    <Action ID="OpenGripper" editable="true">
+      <input_port name="service" default="/gripper/open">legacy service 이름</input_port>
+      <input_port name="left_topic" default="/model/standard_vtol_0/servo_5">왼쪽 gripper joint command 토픽</input_port>
+      <input_port name="right_topic" default="/model/standard_vtol_0/servo_6">오른쪽 gripper joint command 토픽</input_port>
+      <input_port name="detach_topic" default="/survivor_tray_rep/detach">payload detachable joint detach 토픽</input_port>
+      <input_port name="left_position" default="-1.2">왼쪽 open 위치</input_port>
+      <input_port name="right_position" default="-1.2">오른쪽 open 위치</input_port>
+      <input_port name="settle_sec" default="1.0">명령 유지 시간</input_port>
+      <input_port name="publish_rate_hz" default="20.0">명령 발행 주기</input_port>
+      <input_port name="timeout_sec" default="5.0">gripper timeout</input_port>
+    </Action>
+    <Action ID="ActivateYOLO" editable="true">
+      <input_port name="target" default="basket">탐지 target</input_port>
+      <input_port name="mode" default="start_or_set_target">YOLO 활성화 방식</input_port>
+    </Action>
+    <Action ID="DeactivateYOLO" editable="true">
+      <input_port name="target" default="basket">비활성화할 target</input_port>
+    </Action>
+    <Condition ID="IsVisionTopicFresh" editable="true">
+      <input_port name="topic" default="/vision/detections">vision 결과 토픽</input_port>
+      <input_port name="max_age_sec" default="0.5">최신성 허용 시간</input_port>
+    </Condition>
+    <Condition ID="IsObjectDetected" editable="true">
+      <input_port name="target" default="basket">탐지할 객체</input_port>
+      <input_port name="min_confidence" default="0.55">최소 confidence</input_port>
+      <input_port name="stable_frames" default="3">연속 탐지 프레임 수</input_port>
+    </Condition>
+    <Action ID="ExecuteSearchPattern" editable="true">
+      <input_port name="target" default="basket">탐색 target</input_port>
+      <input_port name="pattern" default="spiral_or_lawnmower">탐색 패턴</input_port>
+      <input_port name="max_duration_sec" default="45.0">최대 탐색 시간</input_port>
+    </Action>
+    <Action ID="AlignToBasket" editable="true">
+      <input_port name="pixel_tolerance_px" default="25">허용 pixel 오차</input_port>
+      <input_port name="yaw_tolerance_rad" default="0.1">허용 yaw 오차</input_port>
+      <input_port name="stable_duration_sec" default="1.0">정렬 유지 시간</input_port>
+      <input_port name="timeout_sec" default="35.0">정렬 timeout</input_port>
+    </Action>
+    <Action ID="AlignToLandingMarker" editable="true">
+      <input_port name="pixel_tolerance_px" default="25">허용 pixel 오차</input_port>
+      <input_port name="yaw_tolerance_rad" default="0.1">허용 yaw 오차</input_port>
+      <input_port name="stable_duration_sec" default="1.0">정렬 유지 시간</input_port>
+      <input_port name="timeout_sec" default="35.0">정렬 timeout</input_port>
+    </Action>
+    <Action ID="DescendWithAlignment" editable="true">
+      <input_port name="target" default="basket">정렬 유지 target</input_port>
+      <input_port name="descent_step_m" default="0.3">단계 하강량</input_port>
+      <input_port name="min_confidence" default="0.55">최소 confidence</input_port>
+      <input_port name="max_lost_time_sec" default="0.7">탐지 상실 허용 시간</input_port>
+      <input_port name="timeout_sec" default="60.0">하강 timeout</input_port>
+      <input_port name="target_altitude_m" default="0.8">하강 목표 고도</input_port>
+    </Action>
+    <Action ID="LandOnBasketZone" editable="true">
+      <input_port name="target_altitude_m" default="0.35">그리퍼 동작 목표 고도</input_port>
+      <input_port name="max_horizontal_error_m" default="0.20">허용 수평 오차</input_port>
+      <input_port name="timeout_sec" default="30.0">착륙 구역 접근 timeout</input_port>
+    </Action>
+    <Action ID="CloseGripper" editable="true">
+      <input_port name="service" default="/gripper/close">legacy service 이름</input_port>
+      <input_port name="left_topic" default="/model/standard_vtol_0/servo_5">왼쪽 gripper joint command 토픽</input_port>
+      <input_port name="right_topic" default="/model/standard_vtol_0/servo_6">오른쪽 gripper joint command 토픽</input_port>
+      <input_port name="attach_topic" default="/survivor_tray_rep/attach">payload detachable joint attach 토픽</input_port>
+      <input_port name="left_position" default="0.5">왼쪽 close 위치</input_port>
+      <input_port name="right_position" default="0.5">오른쪽 close 위치</input_port>
+      <input_port name="settle_sec" default="1.0">명령 유지 시간</input_port>
+      <input_port name="publish_rate_hz" default="20.0">명령 발행 주기</input_port>
+      <input_port name="timeout_sec" default="5.0">gripper timeout</input_port>
+    </Action>
+    <Action ID="VerifyBasketPicked" editable="true">
+      <input_port name="method" default="gripper_feedback_or_visual_invariant">픽업 검증 방식</input_port>
+      <input_port name="lift_test_height_m" default="0.5">픽업 검증용 미소 상승 고도</input_port>
+      <input_port name="timeout_sec" default="10.0">검증 timeout</input_port>
+    </Action>
+    <Condition ID="VerifyPayloadSecured" editable="true">
+      <input_port name="method" default="gripper_feedback_or_visual_invariant">payload secure 확인 방식</input_port>
+    </Condition>
+    <Action ID="RecoverVisionLanding" editable="true">
+      <input_port name="policy" default="hover_climb_reacquire">비전 착륙 실패 복구 정책</input_port>
+      <input_port name="climb_altitude_m" default="1.5">재탐색 전 상승 고도</input_port>
+      <input_port name="timeout_sec" default="20.0">복구 timeout</input_port>
+    </Action>
+    <Action ID="LandOnLandingZone" editable="true">
+      <input_port name="handoff_altitude_m" default="1.0">AUTO.LAND handoff 고도</input_port>
+      <input_port name="max_horizontal_error_m" default="0.25">허용 수평 오차</input_port>
+      <input_port name="timeout_sec" default="30.0">착륙 구역 접근 timeout</input_port>
+    </Action>
+    <Action ID="DetectLanding" editable="true">
+      <input_port name="max_relative_altitude_m" default="0.3">착륙 판정 상대 고도</input_port>
+      <input_port name="max_vertical_speed_mps" default="0.2">착륙 판정 수직 속도</input_port>
+      <input_port name="timeout_sec" default="45.0">착륙 판정 timeout</input_port>
+    </Action>
+    <Action ID="VerifyLandingComplete" editable="true">
+      <input_port name="require_disarmed" default="true">disarm 필요 여부</input_port>
+      <input_port name="timeout_sec" default="20.0">완료 검증 timeout</input_port>
+    </Action>
+    <Action ID="RecoverFinalLanding" editable="true">
+      <input_port name="policy" default="hover_reacquire_else_autoland">최종 착륙 실패 복구 정책</input_port>
+      <input_port name="climb_altitude_m" default="1.0">재탐색 전 상승 고도</input_port>
+      <input_port name="timeout_sec" default="20.0">복구 timeout</input_port>
+    </Action>
+    <Action ID="FailAfterRecovery" editable="true" />
+    <Action ID="ExecuteExternalRescueModule" editable="true">
+      <input_port name="enable_topic" default="/krac/rescue_module/enable" />
+      <input_port name="ready_topic" default="/krac/rescue_module/ready" />
+      <input_port name="result_topic" default="/krac/rescue_module/result" />
+      <input_port name="request_rate_hz" default="2.0" />
+      <input_port name="handover_timeout_sec" default="15.0" />
+      <input_port name="execution_timeout_sec" default="240.0" />
+      <input_port name="handback_hold_sec" default="1.0" />
+    </Action>
+  </TreeNodesModel>
+</root>

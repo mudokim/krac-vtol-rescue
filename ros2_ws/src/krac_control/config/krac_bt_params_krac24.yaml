@@ -1,0 +1,41 @@
+krac_bt_runner:
+  ros__parameters:
+    bt_xml_path: ""
+    tick_rate_hz: 10.0
+    max_ticks: 0
+    print_bt_transitions: false
+
+    mavros_ns: "/mavros"
+    mission_dir: ""
+
+    # SITL/staged integration defaults. Turn these off only after wiring real devices.
+    sim_bypass: true
+    mission_upload_stub_success: false
+    gripper_stub_success: false
+
+    # Replace these with your mission coordinates before full route tests.
+    rep_point: [0.0, 0.0, 10.0]
+    home_point: [0.0, 0.0, 10.0]
+
+    align_p_gain: 0.005
+    max_align_speed: 0.5
+    descend_speed: 0.25
+
+    # krac24.plan 버전. 원본 14개 항목(seq 0~13)에 VTOL_LAND safety-net(seq 14)을 붙였다.
+    # MAVROS wp_seq는 QGC 화면 번호(doJumpId)보다 1 작다.
+    #   seq0 TAKEOFF, seq1~4 WP(patrol 왕복 첫 구간), seq5 DO(좌표없음),
+    #   seq6 QGC #7 REP, seq7 WP(기존 재상승 복귀 지점), seq8 DO(좌표없음),
+    #   seq9~11 WP(복귀 patrol), seq11 QGC #12, seq12 DO(좌표없음),
+    #   seq13 버티포트, seq14 VTOL_LAND safety-net.
+    # krac24 BT는 QGC #12(seq11) 도달 후 mission current를 QGC #7(seq6)으로
+    # 되돌리고, 그 재방문 시점에 YOLO 기반 rescue landing/pick을 수행한다.
+    # pick 완료 후에는 seq7부터 재개한다. seq7은 QGC #12 위치와 거의 같은 복귀점이고,
+    # 이후 seq8 DO transition으로 FW 전환해 복귀 patrol을 이어간다.
+    # 주의: 이 값들은 실제로는 읽히지 않고 krac_mission_bt_krac24.xml에
+    # 리터럴로 박혀 있음 — krac24.plan을 바꾸면 그 XML의 seq도 같이 갱신할 것.
+    rescue_wp_seq: 6
+    resume_wp_seq: 7
+    # drop_wp_seq: krac24.plan에도 드롭존 웨이포인트가 없어 현재 미사용.
+    drop_wp_seq: 999
+    landing_wp_seq: 13
+    safe_ascend_alt: 30.0
