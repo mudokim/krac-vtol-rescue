@@ -200,7 +200,3 @@ BT와 `/mavros/...` 기반 인터페이스는 가능한 한 유지해 **미션 �
 하드웨어, 제어, 소프트웨어 팀이 서로 다른 책임을 가지고 개발하는 환경에서 어떤 인터페이스가 필요한지, 변경 사항을 어떻게 공유해야 하는지, 한 팀의 수정이 전체 시스템에 어떤 영향을 주는지 직접 경험했습니다.
 
 또한 PX4, MAVROS, QGroundControl, BehaviorTree.CPP 등을 실제 프로젝트 흐름 안에서 처음부터 설정하고 사용하면서, 새로운 프레임워크를 빠르게 이해하고 시스템에 통합하는 경험을 쌓았습니다.
-
-## Portfolio
-
-- [KRAC VTOL Rescue Mission Portfolio](https://app.notion.com/p/39336ae1bc33803fa310d84ecdea959d)
